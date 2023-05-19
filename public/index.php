@@ -78,7 +78,7 @@ $jwtMiddleware = function (Request $request, $handler) use ($secretKey) {
         $request = $request->withAttribute('token', $decodedToken);
     } catch (Exception $e) {
         // Handle token validation errors, e.g., return an error response
-        $response = new \Slim\Psr7\Response(403);
+        $response = new \Slim\Psr7\Response(401);
         $response->getBody()->write($e->getMessage());
         return $response;
     }
