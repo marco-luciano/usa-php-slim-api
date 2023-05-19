@@ -15,6 +15,11 @@ use Firebase\JWT\JWT;
 
 /**
  * @OA\Info(title="USA States and Counties API", version="0.1")
+ *
+ * @OA\Server(
+ *     url="http://localhost:8080",
+ *     description="API server"
+ * )
  */
 
 /**
