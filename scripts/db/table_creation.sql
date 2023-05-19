@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS counties (
 
 CREATE TABLE IF NOT EXISTS users (
     user_id serial NOT NULL,
-    name varchar NOT NULL,
+    name varchar UNIQUE NOT NULL,
     password varchar NOT NULL,
     date_add timestamptz DEFAULT NOW(),
     date_upd timestamptz DEFAULT NOW(),
