@@ -48,7 +48,7 @@ services:
         volumes:
             - .:/app
         working_dir: /app
-        command: require zircote/swagger-php slim/slim:"4.*" slim/psr7:"dev-master"
+        command: require zircote/swagger-php firebase/php-jwt php-di/php-di respect/validation slim/slim:"4.*" slim/psr7:"dev-master"
     swagger:
         command: "public/index.php -o openapi.yaml"
         image: tico/swagger-php
