@@ -12,19 +12,9 @@ class UserValidator
     protected $rules = [];
 
     /**
-     * List of customized messages
-     *
+     * Payload to validate
      * @var array
      */
-    protected $messages = [];
-
-    /**
-     * List of returned errors in case of a failing assertion
-     *
-     * @var array
-     */
-    protected $errors = [];
-
     protected $data = [];
 
     public function __construct($data)
@@ -41,8 +31,11 @@ class UserValidator
     public function initRules()
     {
         $this->rules['username'] = v::alnum('_')->noWhitespace()->length(4, 20)->setName('username');
-        $this->rules['password'] = v::alnum()->noWhitespace()->length(8, 20)->setName('password');
-        $this->rules['passwordConfirmation'] = v::alnum()->noWhitespace()->length(8, 20)->setName('passwordConfirmation');
+        $this->rules['password'] = v::alnum('_')->noWhitespace()->length(8, 20)->setName('password');
+
+        if (isset($this->data['password'])) {
+            $this->rules['passwordConfirmation'] = v::equals($this->data['password'])->setName('passwordConfirmation');
+        }
     }
 
     /**
@@ -60,13 +53,6 @@ class UserValidator
             $validator->assert($this->data[$rule]);
         }
 
-        v::equals($this->data['password'])->assert($this->data['passwordConfirmation']);
-
         return true;
-    }
-
-    public function errors()
-    {
-        return $this->errors;
     }
 }

@@ -2,6 +2,10 @@
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 require dirname(__DIR__) . '/src/classes/UserValidator.php';
+require dirname(__DIR__) . '/src/classes/UserAuthValidator.php';
+require dirname(__DIR__) . '/src/exceptions/UserAlreadyTakenException.php';
+require dirname(__DIR__) . '/src/exceptions/InvalidCredentialsException.php';
+require dirname(__DIR__) . '/src/utils/formatOutput.php';
 
 use DI\Container;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -47,7 +51,6 @@ $container->set('db', function () {
         echo "Connection failed: " . $e->getMessage();
     }
 });
-
 
 $secretKey = $_SERVER['SECRET_KEY'];
 
@@ -95,8 +98,6 @@ $jwtMiddleware = function (Request $request, $handler) use ($secretKey) {
 $app->post('/user', function (Request $request, ResponseInterface $response) {
 
     try {
-        $db = $this->get('db');
-
         $data = json_decode($request->getBody()->getContents(), true);
         $userValidator = new UserValidator($data);
         $userValidator->assert($data);
@@ -105,16 +106,22 @@ $app->post('/user', function (Request $request, ResponseInterface $response) {
         $encryptedPassword = hash('sha3-512', $data['password']);
 
         // check if the user is already registered
+        $db = $this->get('db');
         $stmt = $db->prepare('SELECT COUNT(*) as users_qty FROM users WHERE name = :username');
         $stmt->bindParam(':username', $data['username']);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         // users_qty is 0 if is not registered, hence false, and 1 if is already registered, hence true
         $isAlreadyRegistered = (bool)($result[0]['users_qty']);
 
         if ($isAlreadyRegistered) {
-            throw new Exception(sprintf("Username %s is already taken", $data['username']));
+            $responseMessage = [
+                "status" => 'error',
+                "description" => sprintf("Username %s is already taken", $data['username'])
+            ];
+
+            throw new UserAlreadyTakenException(formatOutput($responseMessage));
         }
 
         // Save the user information in the database
@@ -123,11 +130,19 @@ $app->post('/user', function (Request $request, ResponseInterface $response) {
         $stmt->bindParam(':password', $encryptedPassword);
         $stmt->execute();
 
-        $response->getBody()->write('User registered successfully');
+        $responseMessage = [
+            "status" => 'ok',
+            "description" => 'User registered successfully'
+        ];
+
+        $response->getBody()->write(formatOutput($responseMessage));
         return $response->withStatus(201);
     } catch (Respect\Validation\Exceptions\ValidatorException $e) {
         $response->getBody()->write($e->getFullMessage());
         return $response->withStatus(400);
+    } catch (UserAlreadyTakenException $e) {
+        $response->getBody()->write($e->getMessage());
+        return $response->withStatus(409);
     } catch (Exception $e) {
         $response->getBody()->write($e->getMessage());
         return $response->withStatus(400);
@@ -144,27 +159,68 @@ $app->post('/user', function (Request $request, ResponseInterface $response) {
  */
 
 $app->get('/user/authentication', function (Request $request, ResponseInterface $response) {
-    $exp = new DateTime("now +2 hours");
-    $payload = array(
-        "exp" => $exp->getTimeStamp(),
-        "user_id" => 25
-    );
 
-    $jwt = JWT::encode($payload, $_SERVER['SECRET_KEY'], "HS256");
+    try {
+        $data = json_decode($request->getBody()->getContents(), true);
+        $userValidator = new UserAuthValidator($data);
+        $userValidator->assert($data);
 
-    $data = [
-        "status" => true,
-        "token" => $jwt,
-        "exp" => $exp->getTimeStamp()
-    ];
+        // Encrypt the password
+        $encryptedPassword = hash('sha3-512', $data['password']);
 
-    $payload = json_encode($data);
+        // Save the user information in the database
+        $db = $this->get('db');
+        $stmt = $db->prepare('SELECT * FROM users WHERE name = :username AND password = :passwd');
+        $stmt->bindParam(':username', $data['username']);
+        $stmt->bindParam(':passwd', $encryptedPassword);
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $response->getBody()->write($payload);
+        $validCredentials = (bool)(count($result));
 
-    return $response
-        ->withHeader('Content-Type', 'application/json')
-        ->withStatus(200);
+        if (!$validCredentials) {
+            $responseMessage = [
+                "status" => 'error',
+                "description" => "invalid credentials"
+            ];
+
+            throw new InvalidCredentialsException(formatOutput($responseMessage));
+        }
+
+        // Valid credentials. JWT generation
+        $exp = new DateTime("now +2 hours");
+
+        $payload = array(
+            "exp" => $exp->getTimeStamp(),
+            "user_id" => $result[0]['user_id']
+        );
+
+        $jwt = JWT::encode($payload, $_SERVER['SECRET_KEY'], "HS256");
+
+        $data = [
+            "status" => "ok",
+            "description" => "Login successful",
+            "token" => $jwt,
+            "exp" => $exp->getTimeStamp()
+        ];
+
+        $payload = json_encode($data);
+
+        $response->getBody()->write($payload);
+
+        return $response
+            ->withHeader('Content-Type', 'application/json')
+            ->withStatus(200);
+    } catch (Respect\Validation\Exceptions\ValidatorException $e) {
+        $response->getBody()->write($e->getFullMessage());
+        return $response->withStatus(400);
+    } catch (InvalidCredentialsException $e) {
+        $response->getBody()->write($e->getMessage());
+        return $response->withStatus(401);
+    } catch (Exception $e) {
+        $response->getBody()->write($e->getMessage());
+        return $response->withStatus(400);
+    }
 });
 
 require dirname(__DIR__) . '/src/routes/counties.php';
