@@ -17,7 +17,7 @@
  *    ),
  *    @OA\Response(
  *      response="400", 
- *      description="Invalid state ID"
+ *      description="Invalid State ID"
  *    ),
  *     @OA\Response(
  *      response="401", 
