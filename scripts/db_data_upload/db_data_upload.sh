@@ -24,10 +24,13 @@ COUNTIES_COPY_SQL="COPY temp_counties (county_id, name, state_id, population) FR
 STATES_INSERT_SQL="INSERT INTO states (state_id, name, abbreviation) SELECT state_id, name, abbreviation FROM temp_states ON CONFLICT(state_id) DO NOTHING;"
 COUNTIES_INSERT_SQL="INSERT INTO counties (county_id, name, state_id, population) SELECT county_id, name, state_id, population FROM temp_counties ON CONFLICT(county_id) DO NOTHING;"
 
+ENC_TEST_PASSWD=$(echo -n "$TEST_PASSWORD" | sha3sum -a 512 | cut -d' ' -f1);
+TEST_USER_SQL="INSERT INTO users (name, password) VALUES ('test', '$ENC_TEST_PASSWD') ON CONFLICT(name) DO NOTHING;";
+
 export PGPASSWORD="$POSTGRES_PASSWORD"
 
 # Construct the psql command to execute the SQL statements
-PSQL_COMMAND="psql -h $DB_HOST -d $POSTGRES_DB -U $POSTGRES_USER -c \"$CREATE_TEMP_TABLE_SQL $STATES_COPY_SQL $COUNTIES_COPY_SQL $STATES_INSERT_SQL $COUNTIES_INSERT_SQL\""
+PSQL_COMMAND="psql -h $DB_HOST -d $POSTGRES_DB -U $POSTGRES_USER -c \"$CREATE_TEMP_TABLE_SQL $STATES_COPY_SQL $COUNTIES_COPY_SQL $STATES_INSERT_SQL $COUNTIES_INSERT_SQL $TEST_USER_SQL\""
 
 # Execute the psql command
 eval $PSQL_COMMAND
