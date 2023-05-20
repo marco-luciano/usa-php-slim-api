@@ -6,28 +6,41 @@ require dirname(__DIR__) . '/src/classes/UserAuthValidator.php';
 require dirname(__DIR__) . '/src/exceptions/UserAlreadyTakenException.php';
 require dirname(__DIR__) . '/src/exceptions/InvalidCredentialsException.php';
 require dirname(__DIR__) . '/src/utils/formatOutput.php';
+require dirname(__DIR__) . '/src/utils/JWTWithExpiration.php';
 
 use DI\Container;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Message\ResponseInterface;
 use Slim\Factory\AppFactory;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 /**
- * @OA\Info(title="USA States and Counties API", version="0.1")
- *
+ * @OA\Info(
+ *   title="USA States and Counties API",
+ *   description="REST API for information retrieval about <b> states and counties of the United States Of America. </b> <br><br> Population numbers are 2022 estimates made by the United States Census Bureau
+ *   <a href=https://www.census.gov/programs-surveys/popest.html>US Census Population and Housing Unit Estimates - Official website</a>",
+ *   version="1.0.0",
+ *   @OA\Contact(
+ *     email="marco.magisano.7@gmail.com"
+ *   )
+ * )
+ * 
  * @OA\Server(
  *     url="http://localhost:8080",
- *     description="API server"
+ *     description="Development server"
  * )
- */
-
-/**
- * @OA\Get(
- *     path="/api/resource.json",
- *     @OA\Response(response="200", description="Example")
+ * 
+ * @OA\SecurityScheme(
+ *      type="http",
+ *      name="jwt",
+ *      in="header",
+ *      securityScheme="bearerAuth",
+ *      scheme="bearer",
+ *      description="This API uses JSON Web Token for user authentication",
+ *      bearerFormat="JWT",
  * )
- */
+ **/
 
 $app = AppFactory::create();
 
@@ -75,10 +88,61 @@ $jwtMiddleware = function (Request $request, $handler) use ($secretKey) {
         $tokenArray = explode(' ', $token);
 
         if ($tokenArray[0] !== "Bearer") {
-            throw new Exception("Invalid authorization header. Bearer token expected.");
+
+            $responseMessage = [
+                "status" => 'error',
+                "description" => "Invalid authorization header. Bearer token expected."
+            ];
+            
+            throw new Exception(formatOutput($responseMessage));
         }
 
-        $decodedToken = JWT::decode($tokenArray[1], $secretKey);
+        $decodedToken = JWT::decode($tokenArray[1], new Key($secretKey, 'HS256'));
+
+        $timestamp = (new DateTime('now'))->getTimestamp();
+
+        //check for fields
+        if (isset($decodedToken->exp) && isset($decodedToken->user_id)) {
+            //check for user_id and token expiration
+            if ($decodedToken->exp > $timestamp) {
+                //token correct
+                // check if the user is already registered
+
+                $db = $this->get('db');
+                $stmt = $db->prepare('SELECT * FROM users WHERE user_id = :user_id');
+                $stmt->bindParam(':user_id', $decodedToken->user_id);
+                $stmt->execute();
+                $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (isset($result[0]['user_id'])) {
+                    //token validation successful
+
+                } else {
+                    $responseMessage = [
+                        "status" => 'error',
+                        "description" => "Invalid token"
+                    ];
+
+                    throw new Exception(formatOutput($responseMessage));
+                }
+            } else {
+                //token expired
+                $responseMessage = [
+                    "status" => 'error',
+                    "description" => "Bearer token expired"
+                ];
+
+                throw new Exception(formatOutput($responseMessage));
+            }
+        } else {
+            $responseMessage = [
+                "status" => 'error',
+                "description" => "Invalid token"
+            ];
+
+            throw new Exception(formatOutput($responseMessage));
+        }
+
         // Pass the decoded token to the request attributes for further use
         $request = $request->withAttribute('token', $decodedToken);
     } catch (Exception $e) {
@@ -92,18 +156,11 @@ $jwtMiddleware = function (Request $request, $handler) use ($secretKey) {
     return $handler->handle($request);
 };
 
-/**
- * @OA\Post(
- *     path="/user",
- *     tags={"Users"},
- *     @OA\Response(response="201", 
- * description="Creates a user")
- * )
- */
 $app->post('/user', function (Request $request, ResponseInterface $response) {
 
     try {
         $data = json_decode($request->getBody()->getContents(), true);
+
         $userValidator = new UserValidator($data);
         $userValidator->assert($data);
 
@@ -154,16 +211,7 @@ $app->post('/user', function (Request $request, ResponseInterface $response) {
     }
 });
 
-/**
- * @OA\Get(
- *     tags={"Users"},
- *     path="/user/authentication",
- *     @OA\Response(response="200", 
- *      description="Authenticates a user returning a token")
- * )
- */
-
-$app->get('/user/authentication', function (Request $request, ResponseInterface $response) {
+$app->post('/user/authentication', function (Request $request, ResponseInterface $response) {
 
     try {
         $data = json_decode($request->getBody()->getContents(), true);
@@ -192,21 +240,13 @@ $app->get('/user/authentication', function (Request $request, ResponseInterface 
             throw new InvalidCredentialsException(formatOutput($responseMessage));
         }
 
-        // Valid credentials. JWT generation
-        $exp = new DateTime("now +2 hours");
-
-        $payload = array(
-            "exp" => $exp->getTimeStamp(),
-            "user_id" => $result[0]['user_id']
-        );
-
-        $jwt = JWT::encode($payload, $_SERVER['SECRET_KEY'], "HS256");
+        $jwt = JWTWithExpiration($result[0]['user_id']);
 
         $data = [
             "status" => "ok",
             "description" => "Login successful",
-            "token" => $jwt,
-            "exp" => $exp->getTimeStamp()
+            "token" => $jwt['jwt'],
+            "exp" => $jwt['exp']
         ];
 
         $payload = json_encode($data);
@@ -228,9 +268,18 @@ $app->get('/user/authentication', function (Request $request, ResponseInterface 
     }
 });
 
+$app->get('/user/authentication', function (Request $request, ResponseInterface $response) {
+
+    $jwt = JWTWithExpiration(1);
+    $response->getBody()->write($jwt['jwt']);
+
+    return $response->withStatus(200);
+});
+
 require dirname(__DIR__) . '/src/routes/counties.php';
 require dirname(__DIR__) . '/src/routes/states.php';
 
 $app->add($jwtMiddleware);
+$errorMiddleware = $app->addErrorMiddleware(true, true, true);
 
 $app->run();
