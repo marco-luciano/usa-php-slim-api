@@ -10,7 +10,7 @@ use \Respect\Validation\Validator as v;
 $app->group('/counties', function (RouteCollectorProxy $group) {
     $group->get('/{county_id}', function (Request $request, Response $response, $args) {
         try {
-            v::intVal()->min(0)->setName("county_id")->assert($args['county_id']);
+            v::intVal()->min(1)->setName("county_id")->assert($args['county_id']);
 
             $db = $this->get('db');
             $stmt = $db->prepare(
@@ -82,7 +82,7 @@ $app->group('/counties', function (RouteCollectorProxy $group) {
         try {
             $data = json_decode($request->getBody()->getContents(), true);
 
-            v::intVal()->min(0)->setName("county_id")->assert($args['county_id']);
+            v::intVal()->min(1)->setName("county_id")->assert($args['county_id']);
 
             if (array_key_exists('population', $data)) {
                 v::intVal()->min(0)->setName("population")->assert($data['population']);
@@ -121,7 +121,7 @@ $app->group('/counties', function (RouteCollectorProxy $group) {
                         "date_upd" => $result[0]['date_upd']
                     ]
                 ];
-    
+
                 $response->getBody()->write(formatOutput($responseMessage));
                 return $response->withStatus(200);
             } else {
@@ -148,6 +148,58 @@ $app->group('/counties', function (RouteCollectorProxy $group) {
         }
     });
 
-    $group->delete('/:id', function ($id) {
+    $group->delete('/{county_id}', function (Request $request, Response $response, $args) {
+        try {
+            if (array_key_exists('county_id', $args)) {
+                v::intVal()->min(1)->setName("county_id")->assert($args['county_id']);
+
+                // county_id OK, county delete
+                $db = $this->get('db');
+                $stmt = $db->prepare('DELETE FROM counties WHERE county_id = :county_id');
+                $stmt->bindParam(':county_id', $args['county_id']);
+                $stmt->execute();
+                $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // count equals 1 on delete, 0 no update
+                $delete = (bool)count($result);
+
+                if ($delete) {
+                    // update successful
+                    $responseMessage = [
+                        "status" => 'ok',
+                        "description" => "county_id " . $args['county_id'] . " deleted successfully"
+                    ];
+
+                    $response->getBody()->write(formatOutput($responseMessage));
+                    return $response->withStatus(200);
+                } else {
+                    // non-existing county_id
+                    $respMessage = [];
+                    $respMessage['status'] = "error";
+                    $respMessage['description'] = "Invalid request error - country_id " . $args['county_id'] . " does not exist";
+                    throw new Exception(formatOutput($respMessage));
+                }
+            } else {
+                // non-existing county_id
+                $respMessage = [];
+                $respMessage['status'] = "error";
+                $respMessage['description'] = "Invalid request error";
+                throw new Exception(formatOutput($respMessage));
+            }
+        } catch (Respect\Validation\Exceptions\ValidatorException $e) {
+            $response->getBody()->write($e->getFullMessage());
+            return $response->withStatus(400);
+        } catch (PDOException $e) {
+            $respMessage = [];
+            $respMessage['status'] = "error";
+            $respMessage['description'] = "Internal server error";
+            $response = new \Slim\Psr7\Response(500);
+            $response->getBody()->write(formatOutput($respMessage));
+
+            return $response;
+        } catch (Exception $e) {
+            $response->getBody()->write($e->getMessage());
+            return $response->withStatus(400);
+        }
     });
 });

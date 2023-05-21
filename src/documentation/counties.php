@@ -211,12 +211,56 @@
  * )
  */
 
-
 /**
  * @OA\Delete(
- *     path="/counties",
  *     tags={"Counties"},
- *     @OA\Response(response="200", 
- * description="Deletes a county")
+ *     path="/counties/{county_id}",
+ *     summary="Delete county",
+ *     description="Deletes a county",
+ *     security={{"bearerAuth" : {}}},
+ *     @OA\Parameter(
+ *         name="county_id",
+ *         description="Numeric ID of the county to delete",
+ *         in="path",
+ *         @OA\Schema(type="integer"),
+ *         required="true",
+ *         example=3140
+ *     ),
+ *     @OA\Response(
+ *      response="204", 
+ *      description="County deleted",
+ *      @OA\MediaType(
+ *        mediaType="application/json",
+ *             @OA\Schema(
+ *                 type="object",
+ *                 @OA\Property(
+ *                     property="status",
+ *                     description="Request Status",
+ *                     example="ok",
+ *                     type="string"
+ *                 ),
+ *                 @OA\Property(
+ *                     property="description",
+ *                     description="Description",
+ *                     example="county_id 3140 deleted successfully",
+ *                     type="string"
+ *                 )
+ *             )
+ *          ),
+ *     ),
+ *     @OA\Response(
+ *      response="400", 
+ *      description="Bad Request"
+ *    ),
+ *     @OA\Response(
+ *      response="401", 
+ *      description="Unauthorized. Invalid authorization header"
+ *    ),
+ *     @OA\Response(
+ *      response="500", 
+ *      description="Internal server error"
+ *    )
+ *  )
  * )
- */
+ *
+ **/
