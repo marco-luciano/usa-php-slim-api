@@ -14,3 +14,5 @@ Execute the following command in the root directory:
 ```bash
 docker-compose up --build
 ```
+*Main URL:* http://localhost:8080
+*Swagger Documentation:* http://localhost:8095
