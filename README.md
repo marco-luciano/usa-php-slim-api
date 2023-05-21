@@ -4,7 +4,7 @@ This is a REST API made with PHP, Slim Framework and PostgreSQL, documented with
 
 ## Setup
 
-Before usage, rename the *.env.example* file in the root directory to *.env* and change, if necessary, the environment variables described.
+Before usage, create a *.env* file, following the *.env.example* file in the root directory, and change, if necessary, the environment variables described.
 
 ## Usage
 
