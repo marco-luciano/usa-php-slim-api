@@ -16,7 +16,7 @@
  *       description="Numeric ID of the county to get",
  *       in="path",
  *       @OA\Schema(type="integer"),
- *       required="true",
+ *       required=true,
  *       example=1
  *     ),
  *     @OA\Response(
@@ -138,7 +138,7 @@
  *       description="Numeric ID of the county to update population",
  *       in="path",
  *       @OA\Schema(type="integer"),
- *       required="true",
+ *       required=true,
  *       example=3140
  *     ),
  *     @OA\RequestBody(
@@ -223,7 +223,7 @@
  *         description="Numeric ID of the county to delete",
  *         in="path",
  *         @OA\Schema(type="integer"),
- *         required="true",
+ *         required=true,
  *         example=3140
  *     ),
  *     @OA\Response(

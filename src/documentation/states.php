@@ -42,7 +42,7 @@
  *       description="Numeric ID of the state to get",
  *       in="path",
  *       @OA\Schema(type="integer"),
- *       required="true",
+ *       required=true,
  *       example=1
  *     ),
  *     @OA\Response(
