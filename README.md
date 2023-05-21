@@ -4,13 +4,7 @@ This is a REST API made with PHP, Slim Framework and PostgreSQL, documented with
 
 ## Setup
 
-Before usage, rename the *.env.example* file in the root directory to *.env* and set the following environment variables:
-
-```bash
-POSTGRES_USER=myuser
-POSTGRES_PASSWORD=mypassword
-POSTGRES_DB=slim_api
-```
+Before usage, rename the *.env.example* file in the root directory to *.env* and change, if necessary, the environment variables described.
 
 ## Usage
 
